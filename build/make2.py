@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""ویراستِ تازهٔ «فقه زندگی»: افزودن ۱۵ پرسش به فصل ۱۳ + فصل ۲۱ (ارث، وصیت، سالمندان)
+"""ویراستِ «فقه زندگی» — ۲۸۰ پرسش: پرسش‌های نوجوانان (ادامۀ فصل ۱۳) + فصل ۲۱ (ارث، وصیت، سالمندان)
 
 · متنِ کتاب (صفحات ۲ تا ۵۲۲) دست‌نخورده می‌ماند.
 · دو بلوکِ تازه با همان موتور رندرِ فصل‌های ۱۸ تا ۲۰ ساخته و به پایانِ فایل افزوده می‌شود.
 · شمارۀ صفحاتِ تازه، در ادامهٔ شمارۀ پیشین (۴۶۹ به بعد) درج می‌شود.
 · سطرِ «دویست و پنجاه» در جلد به «دویست و هشتاد» تغییر می‌کند (تنها تغییرِ جلد).
+· ردیفِ «۲۱. فقه ارث، وصیت و حقوق سالمندان» به فهرست مطالب افزوده می‌شود.
 · یادداشتِ «نویسنده: هادی شبستانی» از صفحۀ آخرِ پیشین برداشته و در صفحۀ آخرِ تازه می‌نشیند.
 """
 import sys
@@ -23,7 +24,7 @@ LAST_LABEL = 468                          # آخرین شمارۀ چاپیِ ف�
 def render_new_part():
     b = Book()
     b.pageno_label = 0                     # شمارۀ صفحه در مرحلۀ ادغام درج می‌شود
-    # ---- افزونۀ فصل سیزدهم ----
+    # ---- فصل سیزدهم، پرسش200cهای ۲۵۱ تا ۲۶۵ ----
     ch, qs = ch13x.CHAPTER, ch13x.Q
     items = [(q["num"], q["title"]) for q in qs]
     b.chapter_opener(ch["num"], ch["ordinal"], ch["title"], ch["intro"], items)
@@ -69,151 +70,216 @@ def colophon(b):
     p.draw_line(pymupdf.Point(312, 400), pymupdf.Point(365, 400), color=(0.7882, 0.7608, 0.6784), width=0.8)
     p.draw_rect(pymupdf.Rect(294, 396.5, 301.5, 403.5), color=None, fill=GOLD)
     b.html(pymupdf.Rect(120, 414, 475, 452),
-           '<div dir="rtl" style="text-align:center;font-size:16px;font-weight:bold;color:#b98a2e">'
-           'قلمِ هادی شبستانی</div>')
-    b.html(pymupdf.Rect(120, 456, 475, 486),
-           '<div dir="rtl" style="text-align:center;font-size:10.5px;color:#5a6b64">'
-           'طبعه‌ای خادم در مکتب امام زمان (عج) · ۱۴۵</div>')
+           '<div dir="rtl" style="text-align:center;font-size:18px;font-weight:bold;color:#b98a2e">'
+           'نویسنده: هادی شبستانی</div>')
+    b.html(pymupdf.Rect(120, 458, 475, 486),
+           '<div dir="rtl" style="text-align:center;font-size:11px;color:#5a6b64">'
+           'طبعه‌ای خادم در مکتب امام زمان (عج)</div>')
     b.html(pymupdf.Rect(120, 489, 475, 512),
            '<div dir="rtl" style="text-align:center;font-size:9.5px;color:#8a8a8a">'
            '«دغدغه نصیب هر کسی نمی‌شود» — شهید بهشتی</div>')
 
 
-def _page_image_arrays(pix, dpi):
-    """آرایۀ سادهٔ روشنایی، برای پیداکردنِ خطِ متن در جلد."""
-    W, H, NC = pix.width, pix.height, pix.n
-    smp = pix.samples
-    def lum(x, y):
-        o = (y * W + x) * NC
-        return (smp[o] * 30 + smp[o + 1] * 59 + smp[o + 2] * 11) // 100
-    return W, H, lum
+# ───────────────────────────────  جلد (صفحۀ ۱)  ───────────────────────────────
+DPI = 300                                 # ریزنقشِ بازمصوَرِ جلد
+PD = 200                                  # ریزنقشِ سنجشِ متنِ آزمایشی
+COVER_JOBS = [
+    dict(y0=425, y1=472,
+         old="پاسخ\u200cهای مستدل و منبری به دویست و پنجاه پرسش روز",
+         new="پاسخ\u200cهای مستدل و منبری به دویست و هشتاد پرسش روز"),
+    dict(y0=472, y1=497, old="در بیست فصل", new="در بیست\u200cویک فصل"),
+]
 
 
-def _find_line(pix, y_from, y_to, x_from, x_to, thr=120):
-    """bboxِ خطِ روشنِ متن (بر حسب پیکسلِ تصویرِ pix) در نوارِ داده‌شده."""
-    W, H, lum = _page_image_arrays(pix, None)
-    ys, xs = [], []
-    for y in range(y_from, y_to):
-        hit = [x for x in range(x_from, x_to, 2) if lum(x, y) > thr]
-        if hit:
-            ys.append(y)
-            xs += [x for x in range(x_from, x_to) if lum(x, y) > thr]
-    if not ys:
+def _ink_light(pix, xa, xb, ya, yb, thr=110):
+    """bbox و رنگِ میانگینِ جوهرِ روشن (متنِ طلاییِ جلد) روی زمینۀ تیره."""
+    smp, W, H, n = pix.samples, pix.width, pix.height, pix.n
+    xs, ys, cols = [], [], []
+    for y in range(max(0, ya), min(H, yb)):
+        for x in range(max(0, xa), min(W, xb)):
+            o = (y * W + x) * n
+            if (smp[o] * 30 + smp[o + 1] * 59 + smp[o + 2] * 11) // 100 > thr:
+                xs.append(x); ys.append(y); cols.append((smp[o], smp[o + 1], smp[o + 2]))
+    if not xs:
         return None
-    return (min(xs), min(ys), max(xs), max(ys))
+    cols.sort(key=lambda c: -(c[0] + c[1] + c[2]))
+    m = max(1, len(cols) * 3 // 10)
+    col = tuple(sum(c[i] for c in cols[:m]) // m for i in range(3))
+    return min(xs), min(ys), max(xs), max(ys), col
 
 
-def _measure_text(doc_page, needle):
-    """bboxِ متنی که همین حالا با insert_htmlbox نوشته‌ایم."""
-    for bl in doc_page.get_text("dict")["blocks"]:
-        if bl["type"] != 0:
-            continue
-        for ln in bl["lines"]:
-            for sp in ln["spans"]:
-                if needle in sp["text"]:
-                    return pymupdf.Rect(sp["bbox"])
-    return None
+def _ink_dark(pix, thr=235):
+    from PIL import Image
+    im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")
+    return im.point(lambda v: 255 if v < thr else 0).getbbox()
+
+
+def _probe(text, size, color, arch, cx, rect_top=100.0, rect_h=80.0):
+    """پهنا و جایِ جوهرِ یک سطر، در همان هندسۀ نشاندن روی جلد."""
+    k = PD / 72.0
+    t = pymupdf.open()
+    p = t.new_page(width=W, height=300)
+    p.insert_htmlbox(pymupdf.Rect(cx - 260, rect_top, cx + 260, rect_top + rect_h),
+                     '<div dir="rtl" style="text-align:center;font-size:%gpx;font-weight:bold;'
+                     'color:#%02x%02x%02x">%s</div>' % (size, color[0], color[1], color[2], text),
+                     css=CSS, archive=arch, scale_low=1)
+    bb = _ink_dark(p.get_pixmap(dpi=PD, clip=pymupdf.Rect(0, rect_top, W, rect_top + rect_h)))
+    t.close()
+    if not bb:
+        return None
+    return ((bb[2] - bb[0]) / k, (bb[3] - bb[1]) / k, (bb[1] + bb[3]) / 2 / k)
+
+
+def _fit_size(text, color, arch, want_w, cx):
+    """اندازۀ قلمی که پهناى همۀ سطرِ پیشین را می‌دهد."""
+    best, bw, bo = 12.0, 0.0, 0.0
+    s = 6.0
+    while s <= 30.0:
+        r = _probe(text, s, color, arch, cx)
+        if r and abs(r[0] - want_w) < abs(bw - want_w):
+            best, bw, bo = s, r[0], r[2]
+        s += 0.5
+    return best, bw, bo
 
 
 def fix_cover(doc, base_path):
-    """سطرِ جلد: «دویست و پنجاه» ← «دویست و هشتاد».
+    """دو سطرِ زیرِ عنوانِ جلد: «دویست و پنجاه»←«دویست و هشتاد»، «بیست فصل»←«بیست‌ویک فصل».
 
-    جلد، نگاشتِ تمام‌صفحه است (متن درونِ تصویر است)، پس:
-      ۱) صفحۀ جلد با همان رزولیوشن بازمصوَر می‌شود؛
-      ۲) نوارِ باریکِ سطرِ هدف، با تکه‌ای از زمینۀ پاکِ بالایِ همان سطر پر می‌شود
-         (گرادیان و بافتِ زمینۀ جلد حفظ می‌شود)؛
-      ۳) سطرِ تازه با همان قلمِ کتاب، همان رنگِ طلایی و همان اندازۀ خطِ پیشین
-         به‌صورتِ متنِ واقعی نوشته می‌شود.
+    جلد نگاشتِ تمام‌صفحۀ تصویر است (متن درونِ تصویر است)، پس هر سطر:
+      ۱) با بازمصوَرِ ۳۰۰dpi پیدا می‌شود؛ ۲) نواری به بلندیِ همان سطر با درون‌یابیِ
+      ستونیِ زمینۀ پاکِ بالا و پایین پر می‌شود (بافت و گرادیان حفظ می‌شود)؛
+      ۳) سطرِ تازه با همان قلمِ کتاب، همان رنگِ اندازه‌گیری‌شده و همان اندازۀ سطرِ پیشین
+      (که با آزمونِ پهنا کالیبره شده) به‌صورتِ متنِ واقعی نوشته می‌شود.
     """
     from PIL import Image
     import io
 
-    NEW_LINE = "پاسخ‌های مستدل و منبری به دویست و هشتاد پرسش روز"
-    OLD_MARK = "پاسخ"            # برای سنجشِ جابه‌جاییِ خطِ تازه
     src = pymupdf.open(base_path)
-    DPI = 300
+    arch = pymupdf.Archive("/home/user/fonts")
     k = DPI / 72.0
     pix = src[0].get_pixmap(dpi=DPI)
-
-    # ── ۱) پیداکردنِ خودکارِ خطِ هدف (سطرِ زیرِ عنوان) ─────────────────
-    ln = _find_line(pix, int(430 * k), int(470 * k), int(110 * k), int(490 * k))
-    if ln is None:
-        print("  ! cover line not found")
-        src.close()
-        return
-    px0, py0, px1, py1 = ln
-    band = pymupdf.Rect(px0 / k - 4.5, py0 / k - 4.5, px1 / k + 4.5, py1 / k + 4.5)
-    ink_h_pt = (py1 - py0) / k
-    ink_w_pt = (px1 - px0) / k
-    print("  cover line bbox (pt):", [round(v, 1) for v in band],
-          "| ink %.1f x %.1f" % (ink_w_pt, ink_h_pt))
-
-    # ── ۲) پرکردنِ نوار با زمینۀ پاکِ بالای سطر ────────────────────────
-    img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
-    bx0, bx1 = int(band.x0 * k), int(band.x1 * k)
-    by0, by1 = int(band.y0 * k), int(band.y1 * k)
-    ay, be = by0 - int(4 * k), by1 + int(4 * k)
-    px_ = img.load()
-    top_row = [px_[x, ay] for x in range(bx0, bx1)]
-    bot_row = [px_[x, be] for x in range(bx0, bx1)]
-    n = max(1, by1 - by0)
-    for j in range(by0, by1):
-        t = (j - by0 + 1) / (n + 1)
-        for i, x in enumerate(range(bx0, bx1)):
-            a, b = top_row[i], bot_row[i]
-            px_[x, j] = (int(a[0] + (b[0] - a[0]) * t),
-                         int(a[1] + (b[1] - a[1]) * t),
-                         int(a[2] + (b[2] - a[2]) * t))
-    buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=94)
-    jpg = buf.getvalue()
-
-    # ── ۳)اندازۀ قلم: هم‌سان‌سازیِ پهنای خط با خطِ پیشین ────────────────
+    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("RGB")
+    px = img.load()
     r = src[0].rect
-    arch = pymupdf.Archive("/home/user/fonts")
-    best = 16.5
-    for size in (13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0, 16.5, 17.0):
-        t = pymupdf.open()
-        tp = t.new_page(width=r.width, height=r.height)
-        tp.insert_htmlbox(pymupdf.Rect(0, 60, r.width, 120),
-                          '<div dir="rtl" style="text-align:center;font-size:%gpx;'
-                          'font-weight:bold;color:%s">%s</div>' % (size, GOLD_HEX, NEW_LINE),
-                          css=CSS, archive=arch)
-        bb = _measure_text(tp, OLD_MARK)
-        w = bb.width if bb else 0
-        t.close()
-        if w and abs(w - ink_w_pt) < abs(best - ink_w_pt):
-            pass
-        if w:
-            best = size
-            if w >= ink_w_pt:
-                break
-    print("  cover font size:", best, "(target width %.1f pt)" % ink_w_pt)
+    jobs = []
+    for jb in COVER_JOBS:
+        bb = _ink_light(pix, int(80 * k), int(515 * k), int(jb["y0"] * k), int(jb["y1"] * k))
+        if not bb:
+            print("  ! cover line not found:", jb["new"])
+            continue
+        x0, y0, x1, y1, col = bb
+        cx, cy = (x0 + x1) / 2 / k, (y0 + y1) / 2 / k
+        size, got, _off = _fit_size(jb["old"], col, arch, (x1 - x0) / k, cx)
+        pr = _probe(jb["new"], size, col, arch, cx)
+        print("  cover: '%s'→'%s'  size %.1fpx  ink %.1f→%.1f pt  colour #%02x%02x%02x"
+              % (jb["old"][:12], jb["new"][:12], size, (x1 - x0) / k, pr[0], col[0], col[1], col[2]))
+        bx0, bx1 = max(0, x0 - int(5 * k)), min(img.width - 1, x1 + int(5 * k))
+        by0, by1 = max(0, y0 - int(4 * k)), min(img.height - 1, y1 + int(4 * k))
+        top = [px[x, max(0, by0 - int(3 * k))] for x in range(bx0, bx1)]
+        bot = [px[x, min(img.height - 1, by1 + int(3 * k))] for x in range(bx0, bx1)]
+        n = max(1, by1 - by0)
+        for j in range(by0, by1):
+            t = (j - by0 + 1) / (n + 1)
+            for i, x in enumerate(range(bx0, bx1)):
+                a, b = top[i], bot[i]
+                px[x, j] = tuple(int(a[c] + (b[c] - a[c]) * t) for c in range(3))
+        jobs.append((cx, cy, size, col, jb["new"], pr[2]))
+    src.close()
 
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=95)
     cov = pymupdf.open()
     pc = cov.new_page(width=r.width, height=r.height)
-    pc.insert_image(pymupdf.Rect(0, 0, r.width, r.height), stream=jpg)
-    rect = pymupdf.Rect(band.x0 - 20, band.y0 - 1.5, band.x1 + 20, band.y1 + 6)
-    pc.insert_htmlbox(rect,
-                      '<div dir="rtl" style="text-align:center;font-size:%gpx;font-weight:bold;'
-                      'color:%s">%s</div>' % (best, GOLD_HEX, NEW_LINE),
-                      css=CSS, archive=arch)
-    bb = _measure_text(pc, OLD_MARK)
-    if bb:      # تنظیمِ عمودیِ نهایی: مرکزِ خطِ تازه = مرکزِ خطِ پیشین
-        want_c = (band.y0 + band.y1) / 2 + 1.5
-        dy = want_c - (bb.y0 + bb.y1) / 2
-        if abs(dy) > 1.2:
-            pc.insert_htmlbox(pymupdf.Rect(rect.x0, rect.y0 + dy, rect.x1, rect.y1 + dy),
-                              '<div dir="rtl" style="text-align:center;font-size:%gpx;'
-                              'font-weight:bold;color:%s">%s</div>' % (best, GOLD_HEX, NEW_LINE),
-                              css=CSS, archive=arch)
-    cov[0].get_pixmap(dpi=120).save("/home/user/work/cover_new.png")
-
+    pc.insert_image(pymupdf.Rect(0, 0, r.width, r.height), stream=buf.getvalue())
+    for cx, cy, size, col, text, off in jobs:
+        top = cy - off
+        pc.insert_htmlbox(pymupdf.Rect(cx - 260, top, cx + 260, top + 80),
+                          '<div dir="rtl" style="text-align:center;font-size:%gpx;font-weight:bold;'
+                          'color:#%02x%02x%02x">%s</div>' % (size, col[0], col[1], col[2], text),
+                          css=CSS, archive=arch, scale_low=1)
+    cov[0].get_pixmap(dpi=200, clip=pymupdf.Rect(80, 380, 520, 520)).save("/home/user/work/cover_new.png")
     doc.delete_page(0)
     doc.insert_pdf(cov, from_page=0, to_page=0, start_at=0)
     cov.close()
-    src.close()
-    print("  cover line replaced (page 1)")
+    print("  cover: %d line(s) replaced (page 1)" % len(jobs))
+
+
+# ───────────────────────────────  فهرست مطالب (صفحۀ ۳)  ──────────────────────────────
+ROWS_TOP, ROWS_BOT = 138.6, 787.0        # خطِ نخست و خطِ آخرِ فهرست
+IMG_IN, STRIP_W, STRIP_H = 1.6, 495.0, 25.0
+DPR = 4                                 # پیکسل بر پوند (288dpi) — همان اندازۀ سطرهای خودِ کتاب
+ROW_XREF0 = 75                          # xrefِ تصویرِ سطرِ نخست؛ سطرهای بعدی دو‌دو
+
+
+def _row_png(doc, xref):
+    """تصویرِ خودِ سطر را (با شفافیتِ اصلی‌اش) برمی‌دارد تا بی‌کم‌وکاست جا به جا شود."""
+    base = pymupdf.Pixmap(doc, xref)
+    if base.alpha:
+        base = pymupdf.Pixmap(base, 0)
+    s = doc.xref_get_key(xref, "SMask")
+    if s[0] == "xref":
+        m = pymupdf.Pixmap(doc, int(s[1].split()[0]))
+        if m.alpha:
+            m = pymupdf.Pixmap(m, 0)
+        if (m.width, m.height) != (base.width, base.height):
+            from PIL import Image
+            g = Image.frombytes("L", (m.width, m.height), m.samples).resize((base.width, base.height))
+            m = pymupdf.Pixmap(pymupdf.csGRAY, base.width, base.height, g.tobytes())
+        base = pymupdf.Pixmap(base, m)
+    return base.tobytes("png")
+
+
+def _new_row_png(text, ink_top=7.6):
+    """سطرِ تازه، با همان قلم/قطر/رنگِ سطرهای کتاب، روی نوارِ ۱۹۸۰×۱۰۰ پیکسلی."""
+    from PIL import Image
+    import io
+    arch = pymupdf.Archive("/home/user/fonts")
+    t = pymupdf.open()
+    p = t.new_page(width=W, height=H)
+    p.insert_htmlbox(pymupdf.Rect(L, 150, R, 200),
+                     '<div dir="rtl" style="text-align:end;font-size:12px;font-weight:bold;'
+                     'color:#2b2b2b">%s</div>' % text, css=CSS, archive=arch, scale_low=1)
+    pix = p.get_pixmap(dpi=72 * DPR)
+    t.close()
+    im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    bb = im.convert("L").point(lambda v: 255 if v < 200 else 0).getbbox()
+    ox = int(round(bb[2] - 1962))          # لبۀ راستِ متن، هم‌جای سطرهای دیگر
+    oy = int(round(bb[1] - ink_top * DPR))
+    cv = Image.new("RGB", (int(STRIP_W * DPR), int(STRIP_H * DPR)), (255, 255, 255))
+    cv.paste(im, (-ox, -oy))
+    buf = io.BytesIO()
+    cv.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+def fix_toc(doc, new_rows, replaced=None):
+    """ردیف‌های فهرست مطالب را دست‌نخورده نگه می‌دارد و ردیف‌های نو را به پایان می‌افزاید.
+
+    هر سطرِ فهرست در فایلِ پایه یک نوارِ تصویری است (نه متن)، پس همان تصویرِ خودِ
+    سطر برداشته و با گامِ فشرده‌تر نشسته می‌شود؛ ردیف‌های نو — و ردیفِ سیزدهمی که در
+    فایلِ پایه جابه‌جاییِ حروف داشت — با همان قلم و اندازۀ کتاب از نو ساخته می‌شوند.
+    """
+    p = doc[2]
+    n = 20 + len(new_rows)
+    pitch = (ROWS_BOT - ROWS_TOP) / n
+    replaced = replaced or {}
+    strips = [_new_row_png(replaced[i]) if i in replaced
+              else _row_png(doc, ROW_XREF0 + 2 * i) for i in range(20)]
+    strips += [_new_row_png(t) for t in new_rows]
+
+    p.add_redact_annot(pymupdf.Rect(49.0, ROWS_TOP - 0.9, 546.0, ROWS_BOT + 0.9))
+    p.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_REMOVE,
+                       graphics=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED,
+                       text=pymupdf.PDF_REDACT_TEXT_NONE)
+
+    for i, png in enumerate(strips):
+        y0 = ROWS_TOP + i * pitch + IMG_IN
+        p.insert_image(pymupdf.Rect(50.0, y0, 50.0 + STRIP_W, y0 + STRIP_H), stream=png)
+    for i in range(n + 1):
+        y = ROWS_TOP + i * pitch
+        p.draw_line(pymupdf.Point(L, y), pymupdf.Point(R, y),
+                    color=(0.7882, 0.7608, 0.6784), width=0.7)
+    print("  toc: %d rows (pitch %.2f pt)" % (n, pitch))
 
 
 def strip_old_signature(doc, last_idx):
@@ -257,6 +323,10 @@ def main():
 
     strip_old_signature(base, n_old - 1)
 
+    # ردیفِ فصل بیست‌ویکم به فهرست مطالب افزوده می‌شود
+    fix_toc(base, ["۲۱. فقه ارث، وصیت و حقوق سالمندان"],
+            replaced={12: "۱۳. پرسش\u200cهای نوجوانان (صریح و صمیمی)"})
+
     new = render_new_part()
     print("new pages:", new.page_count)
     base.insert_pdf(new)
@@ -278,7 +348,7 @@ def main():
                        "subject": "فقه کاربردی، مسائل مستحدثه، ارث و وصیت و حقوق سالمندان"})
     base.save(OUT, garbage=4, deflate=True)
     print("pages:", base.page_count, "->", OUT)
-    print("questions: ۲۵ + ۱۵ (افزونۀ فصل ۱۳) + ۱۵ (فصل ۲۱) = ۲۸۰")
+    print("questions: ۲۶۵ پرسشِ نوجوان + ۱۵ پرسشِ فصل ۲۱ = ۲۸۰")
 
 
 if __name__ == "__main__":
