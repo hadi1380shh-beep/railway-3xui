@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""ویراست نهایی «فقه زندگی» — ۲۷۵ پرسش در ۲۱ فصل.
+"""ویراست نهایی «فقه زندگی» — ۲۹۰ پرسش در ۲۱ فصل.
 
 - درج ۲۰ پرسشِ تازهٔ فصل سیزدهم (۲۵۱–۲۷۰) در ادامهٔ همان فصل
 - افزودن فصل بیست و یکم «فقه ارث، وصیت، حقوق سالمندان» (۲۷۱–۲۹۰) در پایان کتاب
-- شماره‌گذاری پیوستهٔ صفحات + اصلاح پیشگفتار + جلد به‌روزشده (۲۷۵ / ۲۱ فصل)
+- شماره‌گذاری پیوستهٔ صفحات + اصلاح پیشگفتار + جلد به‌روزشده (۲۹۰ / ۲۱ فصل)
 """
 import sys, re
 sys.path.insert(0, "/home/user/railway-3xui/build")
@@ -203,7 +203,7 @@ def fix_preface(doc):
         if key == "line1":
             line1 = txt.replace("به صد و", "به دویست")
         else:
-            line2 = txt.replace("هشتاد", "و هفتاد و پنج")
+            line2 = txt.replace("هشتاد", "و نود")
 
     # ۲) پاک‌سازی
     for kind, s in targets:
@@ -267,7 +267,7 @@ def main():
     cov = out.new_page(pno=0, width=595.2756, height=841.8898)
     cov.insert_image(pymupdf.Rect(0, 0, 595.2756, 841.8898), filename=COVER)
 
-    out.set_metadata({"title": "فقه زندگی — ۲۷۵ پرسش در ۲۱ فصل",
+    out.set_metadata({"title": "فقه زندگی — ۲۹۰ پرسش در ۲۱ فصل",
                       "author": "", "subject": "فقه کاربردی و مسائل مستحدثه"})
     out.save(OUT, garbage=4, deflate=True)
     print("supplement pages:", N, " ch21 pages:", len_ch21,
