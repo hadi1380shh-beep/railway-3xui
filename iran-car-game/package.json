@@ -1,0 +1,14 @@
+{
+  "name": "iran-car-game",
+  "version": "1.0.0",
+  "description": "ماشین بازی ایرانی — یک بازی رانندگی سه‌بعدی تحت وب با خودروهای ایرانی (پیکان، پراید، سمند)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node tools/serve.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "three": "0.160.0"
+  }
+}
